@@ -21,8 +21,21 @@ _global_script_class_icons={
 [application]
 
 config/name="Platformer Skeleton"
-run/main_scene="res://Level.tscn"
+run/main_scene="res://Levels/Level1.tscn"
 config/icon="res://icon.png"
+
+[display]
+
+window/size/width=1920
+window/size/height=1080
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
+
+[global]
+
+bavk=false
+back=false
+background=false
 
 [input]
 
@@ -71,4 +84,5 @@ common/enable_pause_aware_picking=true
 
 [rendering]
 
+environment/default_clear_color=Color( 0.709804, 0.709804, 0.709804, 1 )
 environment/default_environment="res://default_env.tres"

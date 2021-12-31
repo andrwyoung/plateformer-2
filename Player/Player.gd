@@ -2,41 +2,43 @@ extends KinematicBody2D
 class_name Player
 
 const UP = Vector2(0, -1)
-const GRAVITY = 2000.0
-const MAX_FALL = 600.0
-const RUN_SPEED = 350.0
+const GRAVITY = 2500.0
+const MAX_FALL = 1200.0
+const RUN_SPEED = 500.0
 const RUN_ACCEL = 0.4
 const RUN_DECEL = 0.6
 const AIR_ACCEL = 0.3
 const AIR_DECEL = 0.1
 
-const DASH_SPEED = 600.0
-const DASH_ACCEL = 0.4
-const DASH_TIME = 0.25
+const DASH_SPEED = 1400.0
+const DASH_ACCEL = .95
+const DASH_TIME = 0.2
 const DASH_COOLDOWN = 0.3
+const DASH_TWEEN_LENGTH = 0.1
 
-const JUMP_SPEED = 700.0
+const JUMP_SPEED = 900.0
 const JUMP_CUT = 0.5 # how much to cut gravity after jump
 const COYOTE_TIME = 0.1
 const GROUND_TIME = 0.1
 
 const KNOCKBACK_TIME = 0.3
-const KNOCKBACK_SPEED = 400
+const KNOCKBACK_SPEED = 600
 
 export var camera_cutoff = 800
 
 var velocity = Vector2.ZERO
 var dir = Vector2.ZERO
 var spawn_point = Vector2()
-var face_direction = 1
 var invulnerable = false
 
 var coyote_timer = 0.0
 var ground_timer = 0.0
-var knockback_timer = 0.0
-
-var dash_timer = -DASH_COOLDOWN
 var able_to_dash = true # dash refresh when touching floor
+var skip_dash_cooldown = false
+
+var coins = 0
+var health = 3
+
 
 
 enum sm {
@@ -53,23 +55,20 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	ground_timer = max(ground_timer - delta, 0)
-	dash_timer = max(dash_timer - delta, -DASH_COOLDOWN)
-	knockback_timer = max(knockback_timer - delta, 0)
 	
 	match state:
 		sm.MOVING:
-			$ColorRect.color = Color(255, 255, 255)
 			dir.x = Input.get_action_strength("ui_right") - Input.get_action_strength("ui_left")
 			dir.y = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
 			
 			# X AXIS
 			if dir.x != 0:
-				face_direction = dir.x
 				if is_on_floor():
 					velocity.x = lerp(velocity.x, RUN_SPEED * dir.x, RUN_ACCEL)
 				else:
 					velocity.x = lerp(velocity.x, RUN_SPEED * dir.x, AIR_ACCEL)
 			else:
+
 				if is_on_floor():
 					velocity.x = lerp(velocity.x, 0, RUN_DECEL)
 				else:
@@ -79,11 +78,13 @@ func _physics_process(delta: float) -> void:
 			apply_gravity(delta)
 			
 			if is_on_floor():
+				get_tree().call_group("Powerups", "enable")
 				coyote_timer = COYOTE_TIME
 				able_to_dash = true
 				
+				
 				if ground_timer > 0:
-					print("ground time!")
+					print("ground time")
 					jump()
 					ground_timer = 0
 				elif Input.is_action_just_pressed("jump"):
@@ -99,7 +100,6 @@ func _physics_process(delta: float) -> void:
 				
 				if velocity.y < 0:
 					if Input.is_action_just_released("jump"):
-						print("cutting jump")
 						velocity.y *= JUMP_CUT
 		sm.DASHING:
 			process_dashing();
@@ -113,15 +113,22 @@ func _physics_process(delta: float) -> void:
 	process_collisions();
 
 
+#HELPER FUNCTIONS
 func calculate_angle_from_self(other_position: Vector2) -> float:
 	var dy = other_position.y - self.position.y
 	var dx = other_position.x - self.position.x
-	var theta = atan(dy / dx)
-	print("theta: ", theta)
+	var theta = PI/2
+	if dx != 0:
+		theta = atan(dy / dx)
 	if dx < 0:
 		theta += PI
 	return theta
 
+#func change_direction(direction: int):
+#	if direction == -1:
+#		$Sprite.set_flip_h(true)
+#	elif direction == 1:
+#		$Sprite.set_flip_h(false)
 
 func apply_gravity(delta: float) -> void:
 	velocity.y = min(velocity.y + GRAVITY * delta, MAX_FALL)
@@ -140,14 +147,12 @@ func init_dash() -> void:
 	able_to_dash = false
 	state = sm.DASHING
 	velocity = Vector2.ZERO
-	dash_timer = DASH_TIME
-	$ColorRect.color = Color(255, 0, 0)
+	
+	$ColorRect.modulate = Color.cornflower
+	$DashTimer.start(DASH_TIME)
 
 func process_dashing() -> void:
-	if dash_timer < 0: 
-		state = sm.MOVING
-	else:
-		velocity = lerp(velocity, DASH_SPEED * dir.normalized(), DASH_ACCEL)
+	velocity = lerp(velocity, DASH_SPEED * dir.normalized(), DASH_ACCEL)
 
 
 
@@ -155,42 +160,94 @@ func process_dashing() -> void:
 # COLLISIONS
 func process_collisions() -> void:
 	for i in get_slide_count():
-		var collision = get_slide_collision(i)
-		if collision.collider.is_in_group("Enemy"):
+		var collider = get_slide_collision(i).collider
+		if collider.is_in_group("Enemy"):
 			if state == sm.DASHING:
 #				able_to_dash = true
-				collision.collider.damage()
+				collider.damage()
 			else:
-				var angle = calculate_angle_from_self(collision.collider.position)
-				collision.collider.attack(angle);
-				init_knockback(angle);
+				var angle = calculate_angle_from_self(collider.position)
+				collider.attack(angle)
+				if state != sm.KNOCKED_BACK:
+					init_knockback(angle)
+					damage_player()
 
-func is_damaged():
+# GAME FUNCTIONS
+func damage_player():
 	print("ouch!!")
+	health -= 1
+	if health <= 0:
+		game_over();
+	
+func game_over():
+	print("game over!")
+	get_tree().reload_current_scene()
 
+
+
+
+# KNOCKBACK
 func init_knockback(direction: float):
-#	print("direction: ", direction, " cos: ", cos(direction), " sin: ", sin(direction))
+	print("direction: ", direction, " cos: ", cos(direction), " sin: ", sin(direction))
 	state = sm.KNOCKED_BACK
-	knockback_timer = KNOCKBACK_TIME
+	$KnockBackTimer.start(KNOCKBACK_TIME)
 	velocity.x = -cos(direction) * KNOCKBACK_SPEED;
 	velocity.y = -sin(direction) * KNOCKBACK_SPEED;
+	print("velocity: ", velocity)
+	
+	$ColorRect.modulate = Color.lightcoral
 
 func process_knockback():
-	if knockback_timer <= 0:
-		state = sm.MOVING
+	pass
+
+
+
+# ANIMATION
+func tween_back_to_normal_color():
+	$Tween.interpolate_property($ColorRect, "modulate", $ColorRect.modulate, Color.white, DASH_TWEEN_LENGTH, Tween.TRANS_LINEAR)
+	$Tween.start()
+
+
 
 # SIGNALS
 func _unhandled_input(event):
 	if event is InputEventMouseButton and event.button_index == BUTTON_LEFT:
-#		print("timer: ", dash_timer, " able to dash: ", able_to_dash, " state: ", state);
+#		print(able to dash: ", able_to_dash, " state: ", state);
 		if event.pressed:
-			if able_to_dash and dash_timer <= -DASH_COOLDOWN:
+			if able_to_dash and $DashCoolDownTimer.is_stopped():
 				dir = get_local_mouse_position().normalized()
 				init_dash()
 	if event.is_action("restart"):
 		get_tree().reload_current_scene()
 
+func powerup():
+	able_to_dash = true
+	skip_dash_cooldown = true
+	$DashCoolDownTimer.stop()
+	
+func collect_coin():
+	coins += 1
+
 func _on_VisibilityNotifier2D_screen_exited() -> void:
-	print("player can't be seen. respawning")
 	print(position)
+	damage_player()
 	position = spawn_point
+
+
+func _on_DashTimer_timeout() -> void:
+	$DashTimer.stop()
+	tween_back_to_normal_color();
+
+	state = sm.MOVING
+	if !skip_dash_cooldown:
+		$DashCoolDownTimer.start(DASH_COOLDOWN)
+
+func _on_DashCoolDownTimer_timeout() -> void:
+	$DashCoolDownTimer.stop()
+
+
+func _on_KnockBackTimer_timeout() -> void:
+	tween_back_to_normal_color();
+	$KnockBackTimer.stop()
+	
+	state = sm.MOVING

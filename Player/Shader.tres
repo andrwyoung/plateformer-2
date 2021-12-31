@@ -1,0 +1,6 @@
+[gd_resource type="CanvasItemMaterial" load_steps=2 format=2]
+
+[sub_resource type="PluginScript" id=1]
+
+[resource]
+script = SubResource( 1 )
