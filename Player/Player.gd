@@ -21,14 +21,19 @@ const JUMP_CUT = 0.5 # how much to cut gravity after jump
 const COYOTE_TIME = 0.1
 const GROUND_TIME = 0.1
 
-const KNOCKBACK_TIME = 0.3
+const KNOCKBACK_TIME = 1
 const KNOCKBACK_SPEED = 600
+
+const NORMAL_COLOR = Color("cbddff")
+const KNOCKBACK_COLOR = Color.lightcoral
+const DASH_COLOR = Color.cornflower
+const DASH_DISABLED_COLOR = Color.white
 
 export var camera_cutoff = 800
 
 var velocity = Vector2.ZERO
 var dir = Vector2.ZERO
-var spawn_point = Vector2()
+var respawn_point = Vector2() 
 var invulnerable = false
 
 var coyote_timer = 0.0
@@ -37,9 +42,13 @@ var able_to_dash = true # dash refresh when touching floor
 var skip_dash_cooldown = false
 
 var coins = 0
-var health = 3
+signal coin_gotten(coins)
 
+const MAX_HEALTH = 3
+var health = MAX_HEALTH
+signal health_changed(health)
 
+const Indicator = preload("res://Indicator.tscn")
 
 enum sm {
 	MOVING,
@@ -51,7 +60,7 @@ var state = sm.MOVING
 
 func _ready() -> void:
 	$Camera2D.limit_bottom = camera_cutoff
-	spawn_point = position # spawn point is where you start out
+	respawn_point = position # spawn point is where you start out
 
 func _physics_process(delta: float) -> void:
 	ground_timer = max(ground_timer - delta, 0)
@@ -68,7 +77,6 @@ func _physics_process(delta: float) -> void:
 				else:
 					velocity.x = lerp(velocity.x, RUN_SPEED * dir.x, AIR_ACCEL)
 			else:
-
 				if is_on_floor():
 					velocity.x = lerp(velocity.x, 0, RUN_DECEL)
 				else:
@@ -78,10 +86,10 @@ func _physics_process(delta: float) -> void:
 			apply_gravity(delta)
 			
 			if is_on_floor():
-				get_tree().call_group("Powerups", "enable")
+				enable_powerups();
 				coyote_timer = COYOTE_TIME
-				able_to_dash = true
-				
+				if $DashCoolDownTimer.is_stopped():
+					able_to_dash = true
 				
 				if ground_timer > 0:
 					print("ground time")
@@ -101,6 +109,9 @@ func _physics_process(delta: float) -> void:
 				if velocity.y < 0:
 					if Input.is_action_just_released("jump"):
 						velocity.y *= JUMP_CUT
+						
+			if able_to_dash and modulate == DASH_DISABLED_COLOR:
+				tween_to_color(NORMAL_COLOR)
 		sm.DASHING:
 			process_dashing();
 		sm.KNOCKED_BACK:
@@ -123,12 +134,50 @@ func calculate_angle_from_self(other_position: Vector2) -> float:
 	if dx < 0:
 		theta += PI
 	return theta
+	
+func is_directly_above(other_position: Vector2) -> bool:
+	var within_x_axis = abs(other_position.x - self.position.x) <= $ColorRect.rect_size.x / 2
+	var within_y_axis = self.position.y < other_position.y
+	return within_x_axis and within_y_axis
 
 #func change_direction(direction: int):
 #	if direction == -1:
 #		$Sprite.set_flip_h(true)
 #	elif direction == 1:
 #		$Sprite.set_flip_h(false)
+
+
+# GAME FUNCTIONS
+func damage_player():
+	print("ouch!!")
+	health -= 1
+	emit_signal("health_changed", health)
+	if health <= 0:
+		game_over();
+	get_tree().call_group("Health", "enable")
+
+func restore_health():
+	health = MAX_HEALTH
+	emit_signal("health_changed", health)
+
+func damage_and_respawn():
+	damage_player()
+	enable_powerups()
+	position = respawn_point
+	velocity = Vector2.ZERO
+	state = sm.KNOCKED_BACK
+	
+	able_to_dash = true
+	$KnockBackTimer.start(KNOCKBACK_TIME)
+	$DashCoolDownTimer.stop()
+	
+	$Tween.stop_all()
+	$DashTimer.start(DASH_TIME)
+	$ColorRect.modulate = KNOCKBACK_COLOR
+
+func game_over():
+	print("game over!")
+	get_tree().reload_current_scene()
 
 func apply_gravity(delta: float) -> void:
 	velocity.y = min(velocity.y + GRAVITY * delta, MAX_FALL)
@@ -137,7 +186,53 @@ func jump() -> void:
 	coyote_timer = 0
 	velocity.y = -JUMP_SPEED
 	
-	
+func enable_powerups() -> void:
+	get_tree().call_group("Powerups", "enable")
+
+func set_spawn_point(collision) -> void:
+	var tilemap = collision.collider
+	var cell = tilemap.world_to_map(collision.position)
+
+	if collision.normal.x == 1: cell += Vector2(-1, -1)
+	if collision.normal.y == 1: cell += Vector2(0, -1)
+	if collision.normal.y == -1: cell += Vector2(-1, 0)
+		
+	var tile_center_pos = tilemap.map_to_world(cell) + tilemap.cell_size / 2
+	respawn_point = tile_center_pos
+	respawn_point.y -= tilemap.cell_size.y / 2 + $ColorRect.rect_size.y / 2
+#			print("player is at: ", position, " and cell is: ", tile_center_pos)
+#	if tilemap.get_cellv(cell) != -1:
+#		var IndicatorInstance = Indicator.instance()
+#		IndicatorInstance.position = respawn_point
+#		get_owner().add_child(IndicatorInstance)
+
+
+
+# COLLISIONS
+func process_collisions() -> void:
+	for i in get_slide_count():
+		var collision = get_slide_collision(i)
+		var collider = collision.collider
+		if collider.is_in_group("Enemy"):
+			if state == sm.DASHING:
+				collider.damage()
+			else:
+				var angle = calculate_angle_from_self(collider.position)
+				collider.attack(angle)
+				if state != sm.KNOCKED_BACK:
+					init_knockback(angle)
+					damage_player()
+		if is_on_floor() and collider.is_in_group("Tile") and is_directly_above(collision.position):
+			set_spawn_point(collision)
+		if collider.is_in_group("Lava") and state != sm.KNOCKED_BACK:
+			damage_and_respawn()
+
+
+
+# ANIMATION
+func tween_to_color(color):
+	$Tween.interpolate_property($ColorRect, "modulate", $ColorRect.modulate, color, DASH_TWEEN_LENGTH, Tween.TRANS_LINEAR)
+	$Tween.start()
 	
 	
 #DASHING
@@ -148,41 +243,12 @@ func init_dash() -> void:
 	state = sm.DASHING
 	velocity = Vector2.ZERO
 	
-	$ColorRect.modulate = Color.cornflower
+	$ColorRect.modulate = DASH_COLOR
+	$Tween.stop_all()
 	$DashTimer.start(DASH_TIME)
 
 func process_dashing() -> void:
 	velocity = lerp(velocity, DASH_SPEED * dir.normalized(), DASH_ACCEL)
-
-
-
-
-# COLLISIONS
-func process_collisions() -> void:
-	for i in get_slide_count():
-		var collider = get_slide_collision(i).collider
-		if collider.is_in_group("Enemy"):
-			if state == sm.DASHING:
-#				able_to_dash = true
-				collider.damage()
-			else:
-				var angle = calculate_angle_from_self(collider.position)
-				collider.attack(angle)
-				if state != sm.KNOCKED_BACK:
-					init_knockback(angle)
-					damage_player()
-
-# GAME FUNCTIONS
-func damage_player():
-	print("ouch!!")
-	health -= 1
-	if health <= 0:
-		game_over();
-	
-func game_over():
-	print("game over!")
-	get_tree().reload_current_scene()
-
 
 
 
@@ -195,26 +261,20 @@ func init_knockback(direction: float):
 	velocity.y = -sin(direction) * KNOCKBACK_SPEED;
 	print("velocity: ", velocity)
 	
-	$ColorRect.modulate = Color.lightcoral
+	$Tween.stop_all()
+	$DashTimer.start(DASH_TIME)
+	$ColorRect.modulate = KNOCKBACK_COLOR
 
 func process_knockback():
 	pass
 
 
 
-# ANIMATION
-func tween_back_to_normal_color():
-	$Tween.interpolate_property($ColorRect, "modulate", $ColorRect.modulate, Color.white, DASH_TWEEN_LENGTH, Tween.TRANS_LINEAR)
-	$Tween.start()
-
-
-
 # SIGNALS
 func _unhandled_input(event):
 	if event is InputEventMouseButton and event.button_index == BUTTON_LEFT:
-#		print(able to dash: ", able_to_dash, " state: ", state);
 		if event.pressed:
-			if able_to_dash and $DashCoolDownTimer.is_stopped():
+			if able_to_dash:
 				dir = get_local_mouse_position().normalized()
 				init_dash()
 	if event.is_action("restart"):
@@ -227,16 +287,16 @@ func powerup():
 	
 func collect_coin():
 	coins += 1
+	emit_signal("coin_gotten", coins)
 
 func _on_VisibilityNotifier2D_screen_exited() -> void:
 	print(position)
-	damage_player()
-	position = spawn_point
+	damage_and_respawn()
 
 
 func _on_DashTimer_timeout() -> void:
 	$DashTimer.stop()
-	tween_back_to_normal_color();
+	tween_to_color(DASH_DISABLED_COLOR)
 
 	state = sm.MOVING
 	if !skip_dash_cooldown:
@@ -247,7 +307,7 @@ func _on_DashCoolDownTimer_timeout() -> void:
 
 
 func _on_KnockBackTimer_timeout() -> void:
-	tween_back_to_normal_color();
+	tween_to_color(NORMAL_COLOR);
 	$KnockBackTimer.stop()
 	
 	state = sm.MOVING
