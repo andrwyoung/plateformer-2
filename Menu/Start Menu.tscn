@@ -1,0 +1,76 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://GUI/Font.tres" type="Theme" id=1]
+[ext_resource path="res://GUI/Xenosphere-RM66.ttf" type="DynamicFontData" id=2]
+[ext_resource path="res://Menu/Start Menu.gd" type="Script" id=3]
+
+[sub_resource type="DynamicFont" id=1]
+size = 200
+font_data = ExtResource( 2 )
+
+[node name="CenterContainer" type="Node2D"]
+script = ExtResource( 3 )
+
+[node name="ColorRect" type="ColorRect" parent="."]
+margin_right = 1920.0
+margin_bottom = 1080.0
+color = Color( 0.980392, 0.980392, 0.980392, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Label" type="Label" parent="."]
+margin_left = 147.0
+margin_top = 139.0
+margin_right = 747.0
+margin_bottom = 340.0
+custom_colors/font_color = Color( 0.376471, 0.564706, 1, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Dash"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+anchor_top = 1.0
+anchor_bottom = 1.0
+margin_left = 187.0
+margin_top = 607.0
+margin_right = 467.0
+margin_bottom = 803.0
+custom_constants/separation = 50
+__meta__ = {
+"_edit_group_": true,
+"_edit_use_anchors_": false
+}
+
+[node name="Start" type="Button" parent="VBoxContainer"]
+margin_right = 280.0
+margin_bottom = 32.0
+theme = ExtResource( 1 )
+text = "Start"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Level Select" type="Button" parent="VBoxContainer"]
+margin_top = 82.0
+margin_right = 280.0
+margin_bottom = 114.0
+theme = ExtResource( 1 )
+text = "Level Select"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Quit" type="Button" parent="VBoxContainer"]
+margin_top = 164.0
+margin_right = 280.0
+margin_bottom = 196.0
+theme = ExtResource( 1 )
+text = "Quit"
+
+[connection signal="pressed" from="VBoxContainer/Start" to="." method="_on_Start_pressed"]
+[connection signal="pressed" from="VBoxContainer/Level Select" to="." method="_on_Level_Select_pressed"]
+[connection signal="pressed" from="VBoxContainer/Quit" to="." method="_on_Quit_pressed"]

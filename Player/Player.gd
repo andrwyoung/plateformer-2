@@ -46,6 +46,7 @@ signal coin_gotten(coins)
 
 const MAX_HEALTH = 3
 var health = MAX_HEALTH
+var damage_taken = 0
 signal health_changed(health)
 
 const Indicator = preload("res://Indicator.tscn")
@@ -53,7 +54,7 @@ const Indicator = preload("res://Indicator.tscn")
 enum sm {
 	MOVING,
 	DASHING,
-	KNOCKED_BACK
+	NO_MOVE
 }
 var state = sm.MOVING
 
@@ -114,8 +115,8 @@ func _physics_process(delta: float) -> void:
 				tween_to_color(NORMAL_COLOR)
 		sm.DASHING:
 			process_dashing();
-		sm.KNOCKED_BACK:
-			process_knockback();
+		sm.NO_MOVE:
+			pass
 		_:
 			print("ERROR: unknown state")
 	
@@ -151,6 +152,7 @@ func is_directly_above(other_position: Vector2) -> bool:
 func damage_player():
 	print("ouch!!")
 	health -= 1
+	damage_taken += 1
 	emit_signal("health_changed", health)
 	if health <= 0:
 		game_over();
@@ -165,7 +167,7 @@ func damage_and_respawn():
 	enable_powerups()
 	position = respawn_point
 	velocity = Vector2.ZERO
-	state = sm.KNOCKED_BACK
+	state = sm.NO_MOVE
 	
 	able_to_dash = true
 	$KnockBackTimer.start(KNOCKBACK_TIME)
@@ -206,7 +208,23 @@ func set_spawn_point(collision) -> void:
 #		IndicatorInstance.position = respawn_point
 #		get_owner().add_child(IndicatorInstance)
 
-
+func complete_level(curr_level) -> void:
+	$GUI.queue_free()
+	
+	var next_level = str("res://Levels/Level", curr_level + 1, ".tscn")
+	
+	# load finish screen
+	var finish_ui = preload("res://GUI/Level Complete UI.tscn").instance()
+	finish_ui.init(next_level, $GUI.get_elapsed_time(), damage_taken, coins)
+	get_parent().add_child(finish_ui)
+	
+	# update scores
+	Scores.update_score(curr_level, coins, $GUI.get_elapsed_time())
+	
+	# get player off the screen
+	$ColorRect.visible = false
+	velocity = Vector2.ZERO
+	state = sm.NO_MOVE
 
 # COLLISIONS
 func process_collisions() -> void:
@@ -219,12 +237,12 @@ func process_collisions() -> void:
 			else:
 				var angle = calculate_angle_from_self(collider.position)
 				collider.attack(angle)
-				if state != sm.KNOCKED_BACK:
+				if state != sm.NO_MOVE:
 					init_knockback(angle)
 					damage_player()
 		if is_on_floor() and collider.is_in_group("Tile") and is_directly_above(collision.position):
 			set_spawn_point(collision)
-		if collider.is_in_group("Lava") and state != sm.KNOCKED_BACK:
+		if collider.is_in_group("Lava") and state != sm.NO_MOVE:
 			damage_and_respawn()
 
 
@@ -255,7 +273,7 @@ func process_dashing() -> void:
 # KNOCKBACK
 func init_knockback(direction: float):
 	print("direction: ", direction, " cos: ", cos(direction), " sin: ", sin(direction))
-	state = sm.KNOCKED_BACK
+	state = sm.NO_MOVE
 	$KnockBackTimer.start(KNOCKBACK_TIME)
 	velocity.x = -cos(direction) * KNOCKBACK_SPEED;
 	velocity.y = -sin(direction) * KNOCKBACK_SPEED;
@@ -264,11 +282,6 @@ func init_knockback(direction: float):
 	$Tween.stop_all()
 	$DashTimer.start(DASH_TIME)
 	$ColorRect.modulate = KNOCKBACK_COLOR
-
-func process_knockback():
-	pass
-
-
 
 # SIGNALS
 func _unhandled_input(event):
@@ -279,6 +292,10 @@ func _unhandled_input(event):
 				init_dash()
 	if event.is_action("restart"):
 		get_tree().reload_current_scene()
+	if event.is_action("pause"):
+		var pause_menu = preload("res://GUI/Paused.tscn").instance()
+		get_parent().add_child(pause_menu)
+		get_tree().paused = true
 
 func powerup():
 	able_to_dash = true
@@ -287,6 +304,7 @@ func powerup():
 	
 func collect_coin():
 	coins += 1
+	$SFX/Coin.play()
 	emit_signal("coin_gotten", coins)
 
 func _on_VisibilityNotifier2D_screen_exited() -> void:

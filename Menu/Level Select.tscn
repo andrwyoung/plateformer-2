@@ -1,0 +1,95 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://Menu/Single Level Select.tscn" type="PackedScene" id=1]
+[ext_resource path="res://GUI/Font.tres" type="Theme" id=2]
+[ext_resource path="res://Menu/Level Select.gd" type="Script" id=3]
+
+[node name="Node2D" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 3 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ColorRect" type="ColorRect" parent="."]
+margin_right = 1920.0
+margin_bottom = 1080.0
+color = Color( 0.980392, 0.980392, 0.980392, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+margin_right = 1920.0
+margin_bottom = 1080.0
+custom_constants/separation = 400
+alignment = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+margin_top = 340.0
+margin_right = 1920.0
+margin_bottom = 340.0
+custom_constants/separation = 300
+alignment = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Single Level" parent="VBoxContainer/HBoxContainer" instance=ExtResource( 1 )]
+margin_left = 660.0
+margin_top = 0.0
+margin_right = 660.0
+margin_bottom = 0.0
+level = 1
+
+[node name="Single Level2" parent="VBoxContainer/HBoxContainer" instance=ExtResource( 1 )]
+margin_left = 960.0
+margin_top = 0.0
+margin_right = 960.0
+margin_bottom = 0.0
+level = 2
+
+[node name="Single Level3" parent="VBoxContainer/HBoxContainer" instance=ExtResource( 1 )]
+margin_left = 1260.0
+margin_top = 0.0
+margin_right = 1260.0
+margin_bottom = 0.0
+level = 3
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="VBoxContainer"]
+margin_top = 740.0
+margin_right = 1920.0
+margin_bottom = 740.0
+custom_constants/separation = 300
+alignment = 1
+
+[node name="Single Level4" parent="VBoxContainer/HBoxContainer2" instance=ExtResource( 1 )]
+margin_left = 810.0
+margin_top = 0.0
+margin_right = 810.0
+margin_bottom = 0.0
+level = 4
+
+[node name="Single Level5" parent="VBoxContainer/HBoxContainer2" instance=ExtResource( 1 )]
+margin_left = 1110.0
+margin_top = 0.0
+margin_right = 1110.0
+margin_bottom = 0.0
+level = 5
+
+[node name="Button" type="Button" parent="."]
+margin_left = 120.0
+margin_top = 969.0
+margin_right = 328.0
+margin_bottom = 1001.0
+theme = ExtResource( 2 )
+text = "Main Menu"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[connection signal="pressed" from="Button" to="." method="_on_Button_pressed"]

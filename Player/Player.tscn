@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=2]
+[gd_scene load_steps=18 format=2]
 
 [ext_resource path="res://Player/Player.gd" type="Script" id=1]
 [ext_resource path="res://Images/Main Character/normal.png" type="Texture" id=2]
@@ -13,12 +13,19 @@
 [ext_resource path="res://Images/Main Character/walk1.png" type="Texture" id=11]
 [ext_resource path="res://Images/Main Character/walk6.png" type="Texture" id=12]
 [ext_resource path="res://Images/Main Character/walk7.png" type="Texture" id=13]
+[ext_resource path="res://Player/In Game UI.tscn" type="PackedScene" id=14]
+[ext_resource path="res://Sounds/Coin.wav" type="AudioStream" id=15]
 
 [sub_resource type="SpriteFrames" id=2]
 animations = [ {
-"frames": [ ExtResource( 2 ) ],
+"frames": [ ExtResource( 11 ), ExtResource( 7 ), ExtResource( 8 ), ExtResource( 9 ), ExtResource( 10 ), ExtResource( 12 ), ExtResource( 13 ), ExtResource( 6 ) ],
 "loop": true,
-"name": "normal",
+"name": "walk",
+"speed": 8.0
+}, {
+"frames": [ ExtResource( 5 ) ],
+"loop": true,
+"name": "jump_down",
 "speed": 5.0
 }, {
 "frames": [ ExtResource( 4 ) ],
@@ -26,15 +33,10 @@ animations = [ {
 "name": "jump",
 "speed": 5.0
 }, {
-"frames": [ ExtResource( 5 ) ],
+"frames": [ ExtResource( 2 ) ],
 "loop": true,
-"name": "jump_down",
+"name": "normal",
 "speed": 5.0
-}, {
-"frames": [ ExtResource( 11 ), ExtResource( 7 ), ExtResource( 8 ), ExtResource( 9 ), ExtResource( 10 ), ExtResource( 12 ), ExtResource( 13 ), ExtResource( 6 ) ],
-"loop": true,
-"name": "walk",
-"speed": 8.0
 } ]
 
 [sub_resource type="RectangleShape2D" id=1]
@@ -83,6 +85,15 @@ drag_margin_bottom = 0.1
 
 [node name="Tween" type="Tween" parent="."]
 
+[node name="GUI" parent="." instance=ExtResource( 14 )]
+
+[node name="SFX" type="Node" parent="."]
+
+[node name="Coin" type="AudioStreamPlayer" parent="SFX"]
+stream = ExtResource( 15 )
+
+[connection signal="coin_gotten" from="." to="GUI" method="_on_Player_coin_gotten"]
+[connection signal="health_changed" from="." to="GUI" method="_on_Player_health_changed"]
 [connection signal="screen_exited" from="VisibilityNotifier2D" to="." method="_on_VisibilityNotifier2D_screen_exited"]
 [connection signal="timeout" from="DashTimer" to="." method="_on_DashTimer_timeout"]
 [connection signal="timeout" from="DashCoolDownTimer" to="." method="_on_DashCoolDownTimer_timeout"]
